@@ -18,10 +18,18 @@
 <body>
 
 <script src="lib/three.min.js"></script>
-<script src="lib/lodash.core.min.js"></script>
+<script src="lib/lodash.min.js"></script>
 <script src="lib/jquery-2.2.0.min.js"></script>
 <script src="lib/cannon.min.js"></script>
 <script>
+var physicsWorker = new Worker('app.js');
+var n = 10;
+var particles = [];
+
+var newWorld = function(n) {
+    physicsWorker.postMessage({command: 'new', count: n});
+};
+
 
 $(document).ready(function() {
     var scene = new THREE.Scene();
@@ -31,18 +39,18 @@ $(document).ready(function() {
     renderer.setSize( window.innerWidth, window.innerHeight );
     document.body.appendChild( renderer.domElement );
 
-    var geometry = new THREE.BoxGeometry(1, 1, 1);
-    var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
-    var cube = new THREE.Mesh( geometry, material );
-    scene.add( cube );
+    particles = _.range(n).map(function(i) {
+        var geometry = new THREE.BoxGeometry(1, 1, 1);
+        var material = new THREE.MeshBasicMaterial({color: 0x00ff00});
+        var cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
+        return cube;
+    });
 
     camera.position.z = 5;
 
     var render = function () {
         requestAnimationFrame(render);
-
-        // cube.rotation.x += 0.1;
-        // cube.rotation.y += 0.1;
 
         renderer.render(scene, camera);
     };
@@ -50,21 +58,18 @@ $(document).ready(function() {
     render();
 
 
+    physicsWorker.addEventListener('message', function(e) {
+        // need to look into https://github.com/schteppe/cannon.js/blob/master/examples/threejs.html
+        // https://github.com/schteppe/cannon.js/tree/master/examples#threejs
+        _.range(n).forEach(function(i) {
+            particles[i].position.y = e.data[i].z;
 
-    var worker = new Worker('app.js');
-    worker.addEventListener('message', function(e) {
-        // cube
-        // console.log(e.data);
-        // cube.position.x = e.data.x;
-        cube.position.y = e.data.z - 1;
-        // cube.position.z = e.data.z + 5;
+            particles[i].position.z = e.data[i].x;
+            particles[i].position.x = e.data[i].y;
+        });
 
-        console.log(e.data);
-        // self.postMessage(sphereBody);
     }, false);
-
-
-    worker.postMessage('Hello World');
+    newWorld(n);
 });
 
 
