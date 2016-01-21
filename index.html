@@ -23,8 +23,28 @@
 <script src="lib/cannon.min.js"></script>
 <script>
 var physicsWorker = new Worker('app.js');
-var n = 10;
+var n = 200;
 var particles = [];
+
+var mouse = {
+    x: 0, y: 0
+};
+var xTheta = 0.0;
+var yTheta = 0.0;
+
+var onDocumentMouseMove = function( event ) {
+            event.preventDefault();
+    if (event.touches && event.touches.length >= 1) {
+        var touch = event.touches[0];
+        mouse.x = ( touch.pageX / window.innerWidth ) * 2 - 1;
+        mouse.y = - ( touch.pageY / window.innerHeight ) * 2 + 1;
+    } else {
+        mouse.x = ( event.pageX / window.innerWidth ) * 2 - 1;
+        mouse.y = - ( event.pageY / window.innerHeight ) * 2 + 1;
+    }
+};
+document.addEventListener('mousemove', onDocumentMouseMove, false);
+document.addEventListener('touchmove', onDocumentMouseMove, false);
 
 var newWorld = function(n) {
     physicsWorker.postMessage({command: 'new', count: n});
@@ -40,18 +60,51 @@ $(document).ready(function() {
     document.body.appendChild( renderer.domElement );
 
     particles = _.range(n).map(function(i) {
-        var geometry = new THREE.BoxGeometry(1, 1, 1);
-        var material = new THREE.MeshBasicMaterial({color: 0x00ff00});
+        var geometry = new THREE.SphereGeometry(1, 6, 6);
+        var material = new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true});
         var cube = new THREE.Mesh(geometry, material);
         scene.add(cube);
+        // console.log(cube);
         return cube;
     });
+    document.addEventListener('keypress', function(e) {
+        // console.log(event.keyCode);
+        // console.log(camera.position);
+        // if (event.keyCode === 122) {
+        //     camera.position.z = camera.position.z + 0.5;
+        // }
+        // if (event.keyCode === 120) {
+        //     camera.position.z = camera.position.z - 0.5;
+        // }
+        // camera.lookAt(new THREE.Vector3(0, 0, 0));
+    });
 
-    camera.position.z = 5;
+    // camera.position.y = 12;
+    // camera.position.x = 12;
+    // camera.position.z = 30;
 
+    var onWindowResize = function() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    };
+    window.addEventListener('resize', onWindowResize, false);
+
+
+
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
     var render = function () {
-        requestAnimationFrame(render);
+        xTheta -= mouse.x;
+        yTheta -= mouse.y;
 
+        camera.position.x = 30 * Math.sin(THREE.Math.degToRad(xTheta));
+        camera.position.z = 30 * Math.cos(THREE.Math.degToRad(xTheta));
+        camera.position.y = 30 * Math.sin(THREE.Math.degToRad(yTheta));
+
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+        camera.updateMatrixWorld();
+
+        requestAnimationFrame(render);
         renderer.render(scene, camera);
     };
 
@@ -59,13 +112,13 @@ $(document).ready(function() {
 
 
     physicsWorker.addEventListener('message', function(e) {
-        // need to look into https://github.com/schteppe/cannon.js/blob/master/examples/threejs.html
-        // https://github.com/schteppe/cannon.js/tree/master/examples#threejs
         _.range(n).forEach(function(i) {
-            particles[i].position.y = e.data[i].z;
-
-            particles[i].position.z = e.data[i].x;
-            particles[i].position.x = e.data[i].y;
+            // console.log(e.data[i].color);
+            particles[i].position.copy(e.data[i].position);
+            particles[i].quaternion.copy(e.data[i].quaternion);
+            // particles[i].material.color.r = e.data[i].color.x;
+            // particles[i].material.color.g = e.data[i].color.y;
+            // particles[i].material.color.b = e.data[i].color.z;
         });
 
     }, false);

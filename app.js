@@ -1,37 +1,31 @@
 importScripts('lib/lodash.min.js', 'lib/cannon.min.js');
 
+
 var world = null
 var particles = {};
 var lastTime;
-var fixedTimeStep = 1.0 / 60.0; // seconds
+var fixedTimeStep = 1.0 / 60.0;
 var maxSubSteps = 3;
 
 
 var newWorld = function (data) {
     world = new CANNON.World();
-    world.gravity.set(0, 0, -9.82);
-
+    world.gravity.set(0, 0, 0);
 
     _.range(data.count).forEach(function(i) {
         var sphereBody = new CANNON.Body({
             mass: 5,
-            position: new CANNON.Vec3(_.random(-3, 3, true), _.random(-3, 3, true), 10),
-            shape: new CANNON.Box(new CANNON.Vec3(1,1,1))
+            position: new CANNON.Vec3(_.random(-25, 25, true),_.random(-25, 25, true), _.random(-25, 25, true)),
+            shape: new CANNON.Sphere(1),
+            velocity: new CANNON.Vec3(_.random(-1, 1, true),_.random(-1, 1, true), _.random(-1, 1, true))
         });
-
+        sphereBody.angularVelocity.set(_.random(-1, 1, true),_.random(-1, 1, true),_.random(-1, 1, true));
+        // sphereBody.color = new CANNON.Vec3(_.random(.85, .95, true), _.random(.15, .30, true), _.random(.15, .30, true));
+        // console.log(sphereBody);
         world.addBody(sphereBody);
 
         particles[_.uniqueId('particle')] = sphereBody;
     });
-
-    var groundBody = new CANNON.Body({
-        mass: 0 // mass == 0 makes the body static
-    });
-
-    var groundShape = new CANNON.Plane();
-    groundBody.addShape(groundShape);
-    world.addBody(groundBody);
-
 };
 
 self.addEventListener('message', function(e) {
@@ -54,9 +48,12 @@ setInterval(function() {
     world.step(fixedTimeStep, dt, maxSubSteps);
     lastTime = currTime;
 
-
     var data = _.keys(particles).map(function(key) {
-        return particles[key].position;
+        return {
+            position: particles[key].position,
+            quaternion: particles[key].quaternion,
+            color: particles[key].color
+        };
     });
     self.postMessage(data);
 
