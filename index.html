@@ -23,7 +23,7 @@
 <script src="lib/cannon.min.js"></script>
 <script>
 var physicsWorker = new Worker('app.js');
-var n = 200;
+var n = 20;
 var particles = [];
 
 var mouse = {
@@ -79,9 +79,6 @@ $(document).ready(function() {
         // camera.lookAt(new THREE.Vector3(0, 0, 0));
     });
 
-    // camera.position.y = 12;
-    // camera.position.x = 12;
-    // camera.position.z = 30;
 
     var onWindowResize = function() {
         camera.aspect = window.innerWidth / window.innerHeight;
@@ -90,6 +87,15 @@ $(document).ready(function() {
     };
     window.addEventListener('resize', onWindowResize, false);
 
+    var lines = [];
+    for (var i = 0; i <250; i++) {
+        var material = new THREE.LineBasicMaterial({color: 0x0000ff});
+        var geometry = new THREE.Geometry();
+        geometry.vertices.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
+        var line = new THREE.Line(geometry, material);
+        scene.add(line);
+        lines.push(line);
+    }
 
 
     camera.lookAt(new THREE.Vector3(0, 0, 0));
@@ -112,13 +118,15 @@ $(document).ready(function() {
 
 
     physicsWorker.addEventListener('message', function(e) {
+        for (var i = 0; i < e.data.constraints.length; i++) {
+            lines[i].geometry.vertices[0].copy(e.data.constraints[i][0]);
+            lines[i].geometry.vertices[1].copy(e.data.constraints[i][1]);
+            lines[i].geometry.verticesNeedUpdate = true;
+        }
+
         _.range(n).forEach(function(i) {
-            // console.log(e.data[i].color);
-            particles[i].position.copy(e.data[i].position);
-            particles[i].quaternion.copy(e.data[i].quaternion);
-            // particles[i].material.color.r = e.data[i].color.x;
-            // particles[i].material.color.g = e.data[i].color.y;
-            // particles[i].material.color.b = e.data[i].color.z;
+            particles[i].position.copy(e.data.particles[i].position);
+            particles[i].quaternion.copy(e.data.particles[i].quaternion);
         });
 
     }, false);
