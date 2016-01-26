@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Robert Sheehy</title>
+  <title>Bit Synth</title>
 
     <style>
         body {
@@ -21,10 +21,25 @@
 <script src="lib/lodash.min.js"></script>
 <script src="lib/jquery-2.2.0.min.js"></script>
 <script src="lib/cannon.min.js"></script>
+<script src="lib/stats.min.js"></script>
+
 <script>
 var physicsWorker = new Worker('app.js');
-var n = 20;
+
+var renderStats = new Stats();
+renderStats.domElement.style.position = 'absolute';
+renderStats.domElement.style.top = '0px';
+
+var physicStats = new Stats();
+physicStats.domElement.style.position = 'absolute';
+physicStats.domElement.style.right = '0px';
+physicStats.domElement.style.top = '0px';
+
+
+var n = 50;
+var i,j,k;
 var particles = [];
+var lines = [];
 
 var mouse = {
     x: 0, y: 0
@@ -32,15 +47,15 @@ var mouse = {
 var xTheta = 0.0;
 var yTheta = 0.0;
 
-var onDocumentMouseMove = function( event ) {
-            event.preventDefault();
+var onDocumentMouseMove = function(event) {
+    event.preventDefault();
     if (event.touches && event.touches.length >= 1) {
         var touch = event.touches[0];
-        mouse.x = ( touch.pageX / window.innerWidth ) * 2 - 1;
-        mouse.y = - ( touch.pageY / window.innerHeight ) * 2 + 1;
+        mouse.x = (touch.pageX/window.innerWidth) * 2 - 1;
+        mouse.y = - (touch.pageY/window.innerHeight) * 2 + 1;
     } else {
-        mouse.x = ( event.pageX / window.innerWidth ) * 2 - 1;
-        mouse.y = - ( event.pageY / window.innerHeight ) * 2 + 1;
+        mouse.x = (event.pageX/window.innerWidth) * 2 - 1;
+        mouse.y = - (event.pageY/window.innerHeight) * 2 + 1;
     }
 };
 document.addEventListener('mousemove', onDocumentMouseMove, false);
@@ -57,16 +72,12 @@ $(document).ready(function() {
 
     var renderer = new THREE.WebGLRenderer();
     renderer.setSize( window.innerWidth, window.innerHeight );
-    document.body.appendChild( renderer.domElement );
+    document.body.appendChild(renderer.domElement);
+    document.body.appendChild(renderStats.domElement);
+    document.body.appendChild(physicStats.domElement);
 
-    particles = _.range(n).map(function(i) {
-        var geometry = new THREE.SphereGeometry(1, 6, 6);
-        var material = new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true});
-        var cube = new THREE.Mesh(geometry, material);
-        scene.add(cube);
-        // console.log(cube);
-        return cube;
-    });
+
+
     document.addEventListener('keypress', function(e) {
         // console.log(event.keyCode);
         // console.log(camera.position);
@@ -87,15 +98,15 @@ $(document).ready(function() {
     };
     window.addEventListener('resize', onWindowResize, false);
 
-    var lines = [];
-    for (var i = 0; i <250; i++) {
-        var material = new THREE.LineBasicMaterial({color: 0x0000ff});
-        var geometry = new THREE.Geometry();
-        geometry.vertices.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
-        var line = new THREE.Line(geometry, material);
-        scene.add(line);
-        lines.push(line);
-    }
+    // var lines = [];
+    // for (var i = 0; i <250; i++) {
+    //     var material = new THREE.LineBasicMaterial({color: 0x0000ff});
+    //     var geometry = new THREE.Geometry();
+    //     geometry.vertices.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
+    //     var line = new THREE.Line(geometry, material);
+    //     scene.add(line);
+    //     lines.push(line);
+    // }
 
 
     camera.lookAt(new THREE.Vector3(0, 0, 0));
@@ -112,23 +123,49 @@ $(document).ready(function() {
 
         requestAnimationFrame(render);
         renderer.render(scene, camera);
+        renderStats.update();
     };
 
     render();
 
 
     physicsWorker.addEventListener('message', function(e) {
-        for (var i = 0; i < e.data.constraints.length; i++) {
-            lines[i].geometry.vertices[0].copy(e.data.constraints[i][0]);
-            lines[i].geometry.vertices[1].copy(e.data.constraints[i][1]);
+        var constraints = e.data.constraints;
+        var _particles = e.data.particles;
+        while (lines.length < constraints.length) {
+            var geometry = new THREE.Geometry();
+            geometry.vertices.push(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, 0));
+            var line = new THREE.Line(geometry, new THREE.LineBasicMaterial({color: 0x0000ff}));
+            scene.add(line);
+            lines.push(line);
+        }
+
+        while (lines.length > constraints.length) {
+            scene.remove(lines.pop());
+        }
+
+        for (i = 0; i < constraints.length; i++) {
+            lines[i].geometry.vertices[0].copy(constraints[i][0]);
+            lines[i].geometry.vertices[1].copy(constraints[i][1]);
             lines[i].geometry.verticesNeedUpdate = true;
         }
 
-        _.range(n).forEach(function(i) {
-            particles[i].position.copy(e.data.particles[i].position);
-            particles[i].quaternion.copy(e.data.particles[i].quaternion);
-        });
+        while (particles.length < _particles.length) {
+            var particle = new THREE.Mesh(new THREE.SphereGeometry(1, 6, 6), new THREE.MeshBasicMaterial({color: 0x00ff00, wireframe: true}));
+            scene.add(particle);
+            particles.push(particle)
+        }
 
+        while (particles.length > _particles.length) {
+            scene.remove(particles.pop());
+        }
+
+        for (i = 0; i < particles.length; i++) {
+            particles[i].position.copy(_particles[i].position);
+            particles[i].quaternion.copy(_particles[i].quaternion);
+            particles[i].material.color.setRGB(_particles[i].color.x, _particles[i].color.y, _particles[i].color.z)
+        }
+        physicStats.update();
     }, false);
     newWorld(n);
 });
